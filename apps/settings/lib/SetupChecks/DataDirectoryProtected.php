@@ -57,24 +57,35 @@ class DataDirectoryProtected implements ISetupCheck {
 	}
 
 	public function run(): SetupResult {
-		$datadir = str_replace(\OC::$SERVERROOT . '/', '', $this->config->getSystemValue('datadirectory', ''));
-
-		$dataUrl = $this->urlGenerator->getWebroot() . '/' . $datadir . '/.ocdata';
-
-		$noResponse = true;
-		foreach ($this->runHEAD($dataUrl, httpErrors:false) as $response) {
-			$noResponse = false;
-			if ($response->getStatusCode() === 200) {
-				return SetupResult::error($this->l10n->t('Your data directory and files are probably accessible from the internet. The .htaccess file is not working. It is strongly recommended that you configure your web server so that the data directory is no longer accessible, or move the data directory outside the web server document root.'));
-			} else {
-				$this->logger->debug('[expected] Could not access data directory from outside.', ['url' => $dataUrl]);
-			}
-		}
-
-		if ($noResponse) {
-			return SetupResult::warning($this->l10n->t('Could not check that the data directory is protected. Please check manually that your server does not allow access to the data directory.') . "\n" . $this->serverConfigHelp());
-		}
-		return SetupResult::success();
 		
+		$normalizedServerRoot = realpath(\OC::$SERVERROOT);
+		$normalizedDataDirectory = realpath($this->config->getSystemValue('datadirectory', ''));
+		
+		    // Check if data directory is outside the server root and starts with '/'
+		if ($normalizedDataDirectory[0] === '/' && strpos($normalizedDataDirectory, $normalizedServerRoot) !== 0) {
+			$this->logger->debug('[expected] Data directory is not in the server root.');
+			return SetupResult::success();
+		} else {
+
+			$datadir = str_replace(\OC::$SERVERROOT . '/', '', $this->config->getSystemValue('datadirectory', ''));
+	
+			$dataUrl = $this->urlGenerator->getWebroot() . '/' . $datadir . '/.ocdata';
+	
+			$noResponse = true;
+			foreach ($this->runHEAD($dataUrl, httpErrors:false) as $response) {
+				$noResponse = false;
+				if ($response->getStatusCode() === 200) {
+					return SetupResult::error($this->l10n->t('Your data directory and files are probably accessible from the internet. The .htaccess file is not working. It is strongly recommended that you configure your web server so that the data directory is no longer accessible, or move the data directory outside the web server document root.'));
+				} else {
+					$this->logger->debug('[expected] Could not access data directory from outside.', ['url' => $dataUrl]);
+				}
+			}
+	
+			if ($noResponse) {
+				return SetupResult::warning($this->l10n->t('Could not check that the data directory is protected. Please check manually that your server does not allow access to the data directory.') . "\n" . $this->serverConfigHelp());
+			}
+			return SetupResult::success();
+			
+		}
 	}
 }
